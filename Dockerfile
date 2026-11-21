@@ -1,29 +1,17 @@
-#specifying a base image for a Docker container.
-FROM python:3.10-slim-bullseye
+FROM python:3.10-slim
 
-#run when the Docker container is built.
-#It updates the package list for the  OS using the apt-get update command, 
-# then upgrades any installed packages to their latest versions using the apt-get upgrade -y command. 
-#The -y flag automatically confirms any prompts to upgrade packages without requiring user interaction
-
-RUN apt-get update && apt-get upgrade -y
-
-#run when the Docker container is built.
-# It uses the pip3 command to install or upgrade the AWS CLI 
-
-RUN pip3 --no-cache-dir install --upgrade awscli
-
-RUN pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
-
-#This line of code sets the working directory for the Docker container. 
 WORKDIR /app
 
-#copy files from the host system into the Docker container.
-COPY . /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir -r requirements.txt
+COPY . .
 
-# The CMD instruction provides the command and arguments to be executed when the container is run
-# The command is python3 and the argument is app.py
-# The app.py script will be executed using the python3 interpreter when the container is started
-CMD ["python3", "app.py"]
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1+cpu \
+    gunicorn soundfile && \
+    pip install --no-cache-dir -r requirements.txt
+
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-5030} --workers 1 --threads 2 --timeout 120"]
